@@ -39,8 +39,8 @@ pts *= square_size
 lines = []
 
 # generate points on cube
-dim = np.array([4, 3, -2]) * square_size
-origin = np.array([2, 2]) * square_size
+dim = np.array([2, 2, -2]) * square_size
+origin = np.array([1, 0]) * square_size
 cube = np.zeros((8, 3))
 cube[1::2, 0] = dim[0]
 cube[2:4, 1] = dim[1]
@@ -54,6 +54,16 @@ edges = [[0, 1], [2, 3], [0, 2], [1, 3],
          [0, 4], [1, 5], [2, 6], [3, 7]]
 pts = cube
 lines = edges
+
+# cube 2
+shift = np.array([2, 0, 0]) * square_size
+pts_2 = pts + shift
+# cube 3
+shift = np.array([0, 2, 0]) * square_size
+pts_3 = pts + shift
+
+pts_list = [pts, pts_2, pts_3]
+colors = [(0, 255, 0), (0, 0, 255), (255, 0, 0)]
 
 # 3D CAD model
 #points = []
@@ -92,26 +102,27 @@ for i, f in enumerate(sorted(list_of_images)):
     # R = cv2.Rodrigues(extr[:3])[0] # opencv can be used
     Rt = np.hstack((R, t.reshape((-1, 1))))
 
-    # 3D homogeneous points
-    pts_h = np.c_[pts, np.ones((pts.shape[0], 1))]
-    pts_h = pts_h.T
-
-    # to camera frame
-    pts_c = Rt.dot(pts_h)
-
-    # projection at z=1
-    pts_c_norm = pts_c / pts_c[2, :]
-    # rescale by intrinsics
-    uvs = K.dot(pts_c_norm)
-
-    # Draw points and lines
-    uvs = uvs[:2, :].astype(int).T
-    for uv in uvs:
-        cv2.circle(image, tuple(uv), 2, (0, 255, 0), 1)
-
-    for edge in lines:
-        cv2.line(image, tuple(uvs[edge[0]]), tuple(uvs[edge[1]]),
-                 (0, 255, 0), 2, lineType=cv2.LINE_AA)
+    for i, pts in enumerate(pts_list):
+        # 3D homogeneous points
+        pts_h = np.c_[pts, np.ones((pts.shape[0], 1))]
+        pts_h = pts_h.T
+    
+        # to camera frame
+        pts_c = Rt.dot(pts_h)
+    
+        # projection at z=1
+        pts_c_norm = pts_c / pts_c[2, :]
+        # rescale by intrinsics
+        uvs = K.dot(pts_c_norm)
+    
+        # Draw points and lines
+        uvs = uvs[:2, :].astype(int).T
+        for uv in uvs:
+            cv2.circle(image, tuple(uv), 2, colors[i], 1)
+    
+        for edge in lines:
+            cv2.line(image, tuple(uvs[edge[0]]), tuple(uvs[edge[1]]),
+                     colors[i], 2, lineType=cv2.LINE_AA)
 
     cv2.imwrite(os.path.join(output_dir, name), image[:, :, ::-1])
     print(name, " done")
