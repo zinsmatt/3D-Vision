@@ -56,7 +56,6 @@ ax.scatter(P[:, 0], P[:, 1],  P[:, 2], c="b")
 # Draw origin
 # draw_camera(np.eye(3), np.zeros((3, 1)), 5, "origin")
 
-
 input_dir = "data/images_undistorted"
 
 images_list = glob.glob(os.path.join(input_dir, "*.jpg"))
