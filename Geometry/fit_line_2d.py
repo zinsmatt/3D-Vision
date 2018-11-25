@@ -45,3 +45,18 @@ p0 = [0, -l_est_n[2] / l_est_n[1]]
 p1 = [10, (-l_est_n[2] - l_est_n[0] * 10) / l_est_n[1]]
 line = np.vstack((p0, p1))
 plt.plot(line[:, 0], line[:, 1], "r")
+
+# ***** methode 2 (better) *****
+# substract the centroid
+c = np.mean(points[:, :2], axis=0)
+points_2 = points[:, :2] - c
+
+U2, S2, Vt2 = np.linalg.svd(points_2)
+
+t = Vt2[0, :]
+t /= np.linalg.norm(t)
+
+p0 = c - 10 * t
+p1 = c + 10 * t
+line2 = np.vstack((p0, p1))
+plt.plot(line2[:, 0], line2[:, 1], "g")
