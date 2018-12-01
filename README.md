@@ -10,4 +10,4 @@ Some 3D vision algorithms
 ![alt pose estimation](Pose_Estimation/camera_poses.gif "Camera Poses")
 
 ## Point Feature Detection
-![alt corners detection](Feature_Detectors/detected_harris_corners.png "Detected Harris Corners")
+<img src="Feature_Detectors/detected_harris_corners.png" width="300" height="300">
