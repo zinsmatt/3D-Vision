@@ -8,3 +8,6 @@ Some 3D vision algorithms
 
 ## Camera Pose Estimation
 ![alt pose estimation](Pose_Estimation/camera_poses.gif "Camera Poses")
+
+## Point Feature Detection
+![alt corners detection](Feature_Detectors/detected_harris_corners.png "Detected Harris Corners")
