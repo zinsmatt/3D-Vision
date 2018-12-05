@@ -63,7 +63,7 @@ if __name__ == "__main__":
     corners = harris_corners(img, nb_corners=16, non_maxima_box_size=25)
 
     for c in corners:
-        cv2.circle(img, tuple(c), 8, (0, 0, 255), 2)
+        cv2.circle(img, tuple(c), 8, (0, 0, 255), 3)
 
     cv2.namedWindow("win")
     cv2.imshow("win", img)
