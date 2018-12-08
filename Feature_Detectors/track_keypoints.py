@@ -68,7 +68,7 @@ def draw_tracks(img, kp1, kp2, matches):
     for i, m in enumerate(matches):
         cv2.circle(img, tuple(kp2[i, :]), 4, (0, 255, 0), 2)
         if m >= 0:
-            cv2.circle(img, tuple(kp1[m, :]), 4, (0, 255, 0), 2)
+            # cv2.circle(img, tuple(kp1[m, :]), 4, (0, 255, 0), 2)
             cv2.line(img, tuple(kp2[i, :]), tuple(kp1[m, :]), (255, 0, 0), 2)
 
 
