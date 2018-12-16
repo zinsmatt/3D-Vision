@@ -9,6 +9,11 @@ Some 3D vision algorithms
 ## Camera Pose Estimation
 <img src="Pose_Estimation/camera_poses.gif" width="375" height="237">
 
+## Dense Stereo
+![alt dense stereo](Reconstruction/disparity.gif "Dense Stereo Disparity")
+
+
+
 ## Point Feature Detection
 <img src="Feature_Detectors/detected_harris_corners.png" width="200" height="200">
 
