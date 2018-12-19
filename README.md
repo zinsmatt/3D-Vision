@@ -11,6 +11,7 @@ Some 3D vision algorithms
 
 ## Dense Stereo
 ![alt dense stereo](Reconstruction/disparity.gif "Dense Stereo Disparity")
+![alt dense pointcloud](Reconstruction/dense_pointcloud.png "Dense Point cloud")
 
 
 
