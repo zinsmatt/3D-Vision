@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 2.8)
+project(StereoVision)
+find_package(OpenCV REQUIRED)
+add_executable(StereoVision main.cxx)
+target_link_libraries(StereoVision ${OpenCV_LIBS})
