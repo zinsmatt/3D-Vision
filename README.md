@@ -20,3 +20,10 @@ Some 3D vision algorithms
 ![alt features tracking](Feature_Detectors/tracked_features.gif "Tracked Features")
 
 <img src="Feature_Detectors/sift_matches.png" width="540" height="200">
+
+## Pose Interpolation
+The folder "Pose_Manipulation" contains code to interpolation between poses. This is done using spherical linear interpolation (SLERP) for the orientation and linear interpolation for the position.
+
+<img src="Pose_Manipulation/pose_interpolation.gif" width="500" height="250">
+
+<img src="Pose_Manipulation/pose_interpolation.png" width="500" height="250">
