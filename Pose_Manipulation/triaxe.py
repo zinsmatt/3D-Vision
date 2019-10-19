@@ -51,7 +51,7 @@ def write_pointcloud_OBJ(filename, pts, colors=None):
 
 
      
-def write_pointcloud_PLY(filename, pts, colors):
+def write_pointcloud_PLY(filename, pts, colors=None):
     """
         Write a PLY file from a pointcloud (Nx3) and optional colors (Nx3)
     """
@@ -76,5 +76,7 @@ end_header
             s = " ".join(map(str, p))
             if colors is not None:
                 s += " " + " ".join(map(str, colors[i]))
+            else:
+                s += " 0 0 0\n"
             s += "\n"
             fout.write(s)
