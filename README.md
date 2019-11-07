@@ -22,8 +22,14 @@ Some 3D vision algorithms
 <img src="Feature_Detectors/sift_matches.png" width="540" height="200">
 
 ## Pose Interpolation
-The folder "Pose_Manipulation" contains code to interpolation between poses. This is done using spherical linear interpolation (SLERP) for the orientation and linear interpolation for the position.
+The folder *Pose_Manipulation* contains code to interpolation between poses. This is done using spherical linear interpolation (SLERP) for the orientation and linear interpolation for the position.
 
 <img src="Pose_Manipulation/pose_interpolation.gif" width="500" height="250">
 
 <img src="Pose_Manipulation/pose_interpolation.png" width="500" height="250">
+
+
+## Numercial Optimization
+The folder *Numerical_Optimization* contains different algorithms for unconstrained non-linear minimization. For example, gradient descent or conjugate gradient.
+
+<img src="Numerical_Optimization/doc/gradient_descent.png" width="500" height="250">

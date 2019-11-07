@@ -6,8 +6,12 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.colors as colors
 
-
+# =============================================================================
+# This file contains some iterative algorithm for unconstrained non-linear
+# minimization. For example, the Rosenbrock's function is tried to be minimized.
+# =============================================================================
 
 def f_rosen(x, y):
     """
@@ -27,45 +31,114 @@ def grad_f_rosen(x, y):
 
 #%%
 # visualization
-x = np.linspace(-2, 2, 100)
-y = np.linspace(-2, 2, 100)
+xmin, xmax = -5.0, 5.0
+ymin, ymax = -5.0, 5.0
+x = np.linspace(xmin, xmax, 100)
+y = np.linspace(ymin, ymax, 100)
 X, Y = np.meshgrid(x, y)
-Z = f_rosen(X, Y)
+Z = 0.5 * f_rosen(X, Y)**2
 plt.imshow(Z, interpolation="bicubic", 
            origin="lower",
-           cmap="nipy_spectral",
-           extent=[-2, 2, -2, 2])
-    
-#%%
-# GD
-init_range = 4.0
-x0 = (np.random.random(2) - 0.5) * init_range 
+           cmap="hsv",
+#           norm=colors.LogNorm(vmin=Z.min(), vmax=Z.max()*0.001),
+           norm=colors.PowerNorm(0.1),
+           extent=[xmin, xmax, ymin, ymax])
 
-eps = 1e-5
+    
+#%% Gradient Descent
+
+init_range = 10.0
+x0 = (np.random.random(2) - 0.5) * init_range 
+x0 = np.array([-4.0, 2.0])
+
+eps = 1e-12
 
 cost = f_rosen(*x0)
-loss = cost
+loss = 0.5 * cost**2
 prev_loss = loss + 1
 
 x = x0
+MAX_ITER = 5000
 it = 0
-step = 0.01
+step = 0.05
+use_linear_search_along_gradient = True
 
+if use_linear_search_along_gradient:
+    possible_steps = np.linspace(0.0001, 0.1, 10000).reshape((-1, 1))
 values = [x0]
-while prev_loss - loss > eps:
+while abs(prev_loss - loss) > eps and it < MAX_ITER and np.linalg.norm(x - [1.0, 1.0]) > 1e-4:
     prev_loss = loss
     
-    grad = grad_f_rosen(*x)
+    grad = grad_f_rosen(*x) * f_rosen(*x)
     grad /= np.linalg.norm(grad)
+    
+    if use_linear_search_along_gradient:
+        temp = -((possible_steps * grad) - x)
+        best_idx = np.argmin(f_rosen(temp[:, 0], temp[:, 1]))
+        best_step = possible_steps[best_idx]
+        step = best_step
+    
     x = x - step * grad
+    loss = 0.5 * f_rosen(*x)**2
+    
+    if not use_linear_search_along_gradient:
+        # Heuristic-based step update
+        if loss > prev_loss:
+            step = max(0.0001, step / 2)
+        else:
+            step = min(0.1, step * 1.5)
+    
     it += 1
-    
     values.append(x)
-    
-    loss = f_rosen(*x)
-    print("Loss at iter %d : %.4f" % (it, loss))
+#    print("Loss at iter %d : %.8f" % (it, loss))
         
 values = np.vstack(values)
-plt.plot(values[:,0], values[:, 1], marker='+', markersize=2, lineWidth=1)    
+plt.plot(values[:,0], values[:, 1], marker='+', markersize=2, lineWidth=1, label="Gradient Descent")    
 
+print("Gradient Descent: Converged towards : %.2f %.2f in %d iterations" % (x[0], x[1], it))
+
+
+
+#%% Conjugate Gradients
+
+init_range = 10.0
+#x0 = (np.random.random(2) - 0.5) * init_range 
+
+cost = f_rosen(*x0)
+loss = 0.5 * cost**2
+prev_loss = loss + 1
+
+MAX_ITER = 5000
+it = 0
+
+step = 0.001
+
+x = x0
+g =  grad_f_rosen(*x) * f_rosen(*x)
+g /= np.linalg.norm(g)
+h = g
+values = [x0]
+while abs(prev_loss - loss ) > eps and it < MAX_ITER and np.linalg.norm(x - [1.0, 1.0]) > 1e-4:
+    g_prev = g
+    h_prev = h
+    
+    x = x - step * h
+    loss = 0.5 * f_rosen(*x)**2
+    
+    g = grad_f_rosen(*x) * f_rosen(*x)
+    g /= np.linalg.norm(g)
+    h = g + h_prev * (g - g_prev).dot(g) / (g_prev.dot(g_prev))
+    
+    it += 1
+#    print("Loss at iter %d : %.8f" % (it, loss))
+    
+    values.append(x)
+
+ 
+values = np.vstack(values)
+plt.plot(values[:,0], values[:, 1], marker='+', markersize=2, lineWidth=1, label="Conjugate Gradient")    
+
+print("Conjugate Gradient: Converged towards : %.2f %.2f in %d iterations" % (x[0], x[1], it))
+
+plt.legend()
 
