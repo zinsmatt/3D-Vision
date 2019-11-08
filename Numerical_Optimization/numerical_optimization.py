@@ -32,6 +32,7 @@ def grad_f_rosen(x, y):
 
 F = f_rosen
 grad_F = grad_f_rosen
+
 #%%
 # visualization
 xmin, xmax = -5.0, 5.0
@@ -52,7 +53,7 @@ plt.imshow(Z, interpolation="bicubic",
 
 init_range = 10.0
 x0 = (np.random.random(2) - 0.5) * init_range 
-#x0 = np.array([-4.0, 2.0])
+x0 = np.array([-4.0, 2.0])
 
 eps = 1e-12
 
@@ -123,6 +124,7 @@ h = g
 values = [x0]
 possible_steps = np.linspace(0.0001, 0.1, 10000).reshape((-1, 1))
 while abs(prev_loss - loss ) > eps and it < MAX_ITER and np.linalg.norm(x - [1.0, 1.0]) > 1e-4:
+    prev_loss = loss
     g_prev = g
     h_prev = h
     
@@ -151,3 +153,58 @@ print("Conjugate Gradient: Converged towards : %.2f %.2f in %d iterations" % (x[
 
 plt.legend()
 
+#%% Gauss-Newton
+
+def f_convex1d(x):
+    return -np.exp(-(x - 1.0)**2)
+            #.0 / ((x -3)**2+0.1) + 1.0 / ((x-2)**2+0.05) + 2.0
+        
+def grad_f_convex1d(x):
+#    return -0.4*(x-0.7)**2 * -np.exp(-0.4*(x - 0.7)**2) * -0.4 * 2 * (x - 0.7)
+    return -2.0*(x-1.0)*np.exp((x-1)**2)
+
+F = f_convex1d
+grad_F = grad_f_convex1d
+
+X = np.linspace(xmin, xmax, 1000)
+Y = F(X)
+plt.plot(X, Y)
+
+x0 = np.array([2.5])
+
+cost = F(*x0)
+loss = 0.5 * cost**2
+prev_loss = loss + 1
+
+MAX_ITER = 100
+it = 0
+
+step = 0.001
+
+x = x0
+values = [x0]
+possible_steps = np.linspace(0.0001, 0.1, 10000).reshape((-1, 1))
+while abs(prev_loss - loss ) > eps and it < MAX_ITER and abs(x-1.0) > 1e-4:
+    prev_loss = loss
+    
+    J = grad_F(*x).reshape((1, -1))
+    if (abs(J[0]) < 1e-9):
+        break
+    d = -np.linalg.inv(J.dot(J.T)) * J * F(*x)
+    d = d.flatten()
+    print(J, d)
+    
+    x = x + d
+    loss = 0.5 * F(*x)**2
+    it += 1
+    
+    values.append(x)
+
+values = np.vstack(values)
+#plt.plot(values[:,0], values[:, 1], marker='+', markersize=2, lineWidth=1, label="Gauss Newton")    
+plt.plot(values[:,0], F(values), marker='+', markersize=2, lineWidth=1, label="Gauss Newton")    
+
+#print("Gauss Newton: Converged towards : %.2f %.2f in %d iterations" % (x[0], x[1], it))
+print("Gauss Newton: Converged towards : %.2f in %d iterations" % (x[0], it))
+
+plt.legend()
