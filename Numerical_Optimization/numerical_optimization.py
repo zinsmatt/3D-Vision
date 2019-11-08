@@ -29,6 +29,9 @@ def grad_f_rosen(x, y):
     return np.array([400*x**3-400*y*x+2*x-2, 
                      -200*x**2+200*y])
 
+
+F = f_rosen
+grad_F = grad_f_rosen
 #%%
 # visualization
 xmin, xmax = -5.0, 5.0
@@ -36,7 +39,7 @@ ymin, ymax = -5.0, 5.0
 x = np.linspace(xmin, xmax, 100)
 y = np.linspace(ymin, ymax, 100)
 X, Y = np.meshgrid(x, y)
-Z = 0.5 * f_rosen(X, Y)**2
+Z = 0.5 * F(X, Y)**2
 plt.imshow(Z, interpolation="bicubic", 
            origin="lower",
            cmap="hsv",
@@ -49,11 +52,11 @@ plt.imshow(Z, interpolation="bicubic",
 
 init_range = 10.0
 x0 = (np.random.random(2) - 0.5) * init_range 
-x0 = np.array([-4.0, 2.0])
+#x0 = np.array([-4.0, 2.0])
 
 eps = 1e-12
 
-cost = f_rosen(*x0)
+cost = F(*x0)
 loss = 0.5 * cost**2
 prev_loss = loss + 1
 
@@ -69,17 +72,17 @@ values = [x0]
 while abs(prev_loss - loss) > eps and it < MAX_ITER and np.linalg.norm(x - [1.0, 1.0]) > 1e-4:
     prev_loss = loss
     
-    grad = grad_f_rosen(*x) * f_rosen(*x)
+    grad = grad_F(*x) * F(*x)
     grad /= np.linalg.norm(grad)
     
     if use_linear_search_along_gradient:
         temp = -((possible_steps * grad) - x)
-        best_idx = np.argmin(f_rosen(temp[:, 0], temp[:, 1]))
+        best_idx = np.argmin(F(temp[:, 0], temp[:, 1]))
         best_step = possible_steps[best_idx]
         step = best_step
     
     x = x - step * grad
-    loss = 0.5 * f_rosen(*x)**2
+    loss = 0.5 * F(*x)**2
     
     if not use_linear_search_along_gradient:
         # Heuristic-based step update
@@ -101,10 +104,10 @@ print("Gradient Descent: Converged towards : %.2f %.2f in %d iterations" % (x[0]
 
 #%% Conjugate Gradients
 
-init_range = 10.0
+#init_range = 10.0
 #x0 = (np.random.random(2) - 0.5) * init_range 
 
-cost = f_rosen(*x0)
+cost = F(*x0)
 loss = 0.5 * cost**2
 prev_loss = loss + 1
 
@@ -114,18 +117,24 @@ it = 0
 step = 0.001
 
 x = x0
-g =  grad_f_rosen(*x) * f_rosen(*x)
+g =  grad_F(*x) * F(*x)
 g /= np.linalg.norm(g)
 h = g
 values = [x0]
+possible_steps = np.linspace(0.0001, 0.1, 10000).reshape((-1, 1))
 while abs(prev_loss - loss ) > eps and it < MAX_ITER and np.linalg.norm(x - [1.0, 1.0]) > 1e-4:
     g_prev = g
     h_prev = h
     
-    x = x - step * h
-    loss = 0.5 * f_rosen(*x)**2
+    # find the best step
+    temp = -(possible_steps * h - x)
+    best_idx = np.argmin(F(temp[:, 0], temp[:, 1]))
+    best_step = possible_steps[best_idx]
     
-    g = grad_f_rosen(*x) * f_rosen(*x)
+    x = x - best_step * h
+    loss = 0.5 * F(*x)**2
+    
+    g = grad_F(*x) * F(*x)
     g /= np.linalg.norm(g)
     h = g + h_prev * (g - g_prev).dot(g) / (g_prev.dot(g_prev))
     
