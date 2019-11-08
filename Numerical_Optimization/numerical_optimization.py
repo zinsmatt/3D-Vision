@@ -32,6 +32,7 @@ def grad_f_rosen(x, y):
 
 F = f_rosen
 grad_F = grad_f_rosen
+eps = 1e-12
 
 #%%
 # visualization
@@ -55,7 +56,6 @@ init_range = 10.0
 x0 = (np.random.random(2) - 0.5) * init_range 
 x0 = np.array([-4.0, 2.0])
 
-eps = 1e-12
 
 cost = F(*x0)
 loss = 0.5 * cost**2
@@ -156,27 +156,30 @@ plt.legend()
 #%% Gauss-Newton
 
 def f_convex1d(x):
-    return -np.exp(-(x - 1.0)**2)
+    return 2.0-np.exp(-(x - 1.0)**2)
             #.0 / ((x -3)**2+0.1) + 1.0 / ((x-2)**2+0.05) + 2.0
         
 def grad_f_convex1d(x):
-#    return -0.4*(x-0.7)**2 * -np.exp(-0.4*(x - 0.7)**2) * -0.4 * 2 * (x - 0.7)
-    return -2.0*(x-1.0)*np.exp((x-1)**2)
+    return 2*(x-1)*np.exp(-(x-1)**2)
+
+def grad2_f_convex1d(x):
+    return 2*(-2*(x-1)*np.exp(-(x-1)**2) + np.exp(-(x-1)**2))
 
 F = f_convex1d
 grad_F = grad_f_convex1d
+grad2_F = grad2_f_convex1d
 
 X = np.linspace(xmin, xmax, 1000)
-Y = F(X)
+Y = 0.5 * F(X)**2
 plt.plot(X, Y)
 
-x0 = np.array([2.5])
+x0 = np.array([-0.5])
 
 cost = F(*x0)
 loss = 0.5 * cost**2
 prev_loss = loss + 1
 
-MAX_ITER = 100
+MAX_ITER = 10
 it = 0
 
 step = 0.001
@@ -190,7 +193,19 @@ while abs(prev_loss - loss ) > eps and it < MAX_ITER and abs(x-1.0) > 1e-4:
     J = grad_F(*x).reshape((1, -1))
     if (abs(J[0]) < 1e-9):
         break
-    d = -np.linalg.inv(J.dot(J.T)) * J * F(*x)
+    
+    xx = np.linspace(x-2, x+2, 100)
+#    approx_quadratic = 0.5 * (F(x) + J * (xx - x))**2
+    approx_quadratic = 0.5 * (F(x) + J * (xx - x) + 0.5 * grad2_f_convex1d(x) * (xx - x)**2)**2
+
+    plt.plot(xx, approx_quadratic.flatten())
+        
+#    d = -np.linalg.inv(J.dot(J.T)) * J * F(*x)
+#    d = -1.0/(J*J) * J * F(*x)
+#    d = -(1.0/grad2_f_convex1d(x)) * J * F(*x)
+    d = -(grad_F(x)**2 + F(x)*grad2_F(x))
+    print(grad2_F(x))
+
     d = d.flatten()
     print(J, d)
     
@@ -202,7 +217,7 @@ while abs(prev_loss - loss ) > eps and it < MAX_ITER and abs(x-1.0) > 1e-4:
 
 values = np.vstack(values)
 #plt.plot(values[:,0], values[:, 1], marker='+', markersize=2, lineWidth=1, label="Gauss Newton")    
-plt.plot(values[:,0], F(values), marker='+', markersize=2, lineWidth=1, label="Gauss Newton")    
+plt.plot(values[:,0], 0.5 * F(values)**2, marker='+', markersize=10, lineWidth=1, label="Gauss Newton")    
 
 #print("Gauss Newton: Converged towards : %.2f %.2f in %d iterations" % (x[0], x[1], it))
 print("Gauss Newton: Converged towards : %.2f in %d iterations" % (x[0], it))
