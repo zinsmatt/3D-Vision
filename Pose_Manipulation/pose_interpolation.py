@@ -46,7 +46,7 @@ def apply_pose(pose, pts):
         have to be Nx3. The transformed points are returned (Nx3)
     """
     assert pts.shape[1] == 3
-    if pose.shape == (4, 4):
+    if pose.shape == (4, 4) or pose.shape == (3, 4):
         return (pose[:3, :3] @ pts.T + pose[:3, 3].reshape((3, 1))).T
         pass
     elif pose.size == 7:
