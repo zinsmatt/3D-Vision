@@ -33,3 +33,9 @@ The folder *Pose_Manipulation* contains code to interpolation between poses. Thi
 The folder *Numerical_Optimization* contains different algorithms for unconstrained non-linear minimization. For example, gradient descent or conjugate gradient.
 
 <img src="Numerical_Optimization/doc/gradient_descent.png" width="500" height="250">
+
+
+## Calibration
+The folder *Calibration* contains algorithms to calibration the camera focal view from vanishing points.
+
+<img src="Calibration/doc/calibration.png" width="426" height="320">
