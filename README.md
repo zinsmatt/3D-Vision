@@ -32,7 +32,8 @@ The folder *Pose_Manipulation* contains code to interpolation between poses. Thi
 ## Numercial Optimization
 The folder *Numerical_Optimization* contains different algorithms for unconstrained non-linear minimization. For example, gradient descent or conjugate gradient.
 
-<img src="Numerical_Optimization/doc/gradient_descent.png" width="500" height="250">
+<img src="Numerical_Optimization/doc/gradient_descent.png" width="400" height="400">
+<img src="Numerical_Optimization/doc/nonlinear_least-squares_LM.png" width="500" height="400">
 
 
 ## Calibration
