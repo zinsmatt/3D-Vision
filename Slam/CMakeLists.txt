@@ -61,3 +61,9 @@ target_link_libraries(pose_estimation_3d3d_icp
         g2o::stuff
         Sophus::Sophus
         ${OpenCV_LIBS})
+
+add_executable(pose_estimation_3d3d_icp_ceres pose_estimation_3d3d_icp_ceres.cpp)
+target_link_libraries(pose_estimation_3d3d_icp_ceres
+        ${CERES_LIBRARIES}
+        Sophus::Sophus
+        ${OpenCV_LIBS})
