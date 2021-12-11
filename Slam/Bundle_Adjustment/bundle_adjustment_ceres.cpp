@@ -53,6 +53,9 @@ struct ReprojectionError
 
 
 int main(int argc, char **argv) {
+
+    // Data can be downloaded from: https://grail.cs.washington.edu/projects/bal/
+
     if (argc != 2) {
         cout << "usage: bundle_adjustment_ceres bal_data.txt" << endl;
         return 1;

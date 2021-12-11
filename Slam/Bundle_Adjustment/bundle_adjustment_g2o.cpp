@@ -107,6 +107,9 @@ class EdgeReprojection: public g2o::BaseBinaryEdge<2, Eigen::Vector2d, VertexCam
         _error = _measurement - uv;
     }
 
+    // No jacobian
+    // use numeric derivatives
+
     virtual bool read(std::istream&) override {}
     virtual bool write(std::ostream&) const override {}
 
@@ -114,6 +117,8 @@ class EdgeReprojection: public g2o::BaseBinaryEdge<2, Eigen::Vector2d, VertexCam
 
 
 int main(int argc, char **argv) {
+
+    // Data can be downloaded from: https://grail.cs.washington.edu/projects/bal/
 
     if (argc != 2) {
         cout << "usage: bundle_adjustment_g2o bal_data.txt" << endl;
