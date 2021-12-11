@@ -19,6 +19,14 @@ Some 3D vision algorithms
 
 ![alt features tracking](Feature_Detectors/tracked_features.gif "Tracked Features")
 
+## Bundle Adjustment
+<img src="Slam/Bundle_Adjustment/doc/bundle_adjustment.png" width="800" height="226">
+
+
+## Calibration
+The folder *Calibration* contains algorithms to calibration the camera focal view from vanishing points.
+
+<img src="Calibration/doc/calibration.png" width="426" height="320">
 
 
 ## Pose Interpolation
@@ -36,7 +44,3 @@ The folder *Numerical_Optimization* contains different algorithms for unconstrai
 <img src="Numerical_Optimization/doc/nonlinear_least-squares_LM.png" width="400" height="300">
 
 
-## Calibration
-The folder *Calibration* contains algorithms to calibration the camera focal view from vanishing points.
-
-<img src="Calibration/doc/calibration.png" width="426" height="320">
