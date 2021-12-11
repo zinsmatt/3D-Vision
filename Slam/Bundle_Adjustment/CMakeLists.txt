@@ -17,6 +17,7 @@ include_directories(${PROJECT_SOURCE_DIR} ${EIGEN3_INCLUDE_DIR} ${CSPARSE_INCLUD
 
 add_library(bal_common common.cpp)
 add_executable(bundle_adjustment_ceres bundle_adjustment_ceres.cpp)
+add_executable(bundle_adjustment_g2o bundle_adjustment_g2o.cpp)
 
 target_link_libraries(bundle_adjustment_ceres ${CERES_LIBRARIES} Sophus::Sophus bal_common)
-# target_link_libraries(bundle_adjustment_g2o g2o::core g2o::stuff g2o::csparse_extension cxsparse Sophus::Sophus bal_common)
+target_link_libraries(bundle_adjustment_g2o g2o::core g2o::stuff g2o::csparse_extension cxsparse Sophus::Sophus bal_common)

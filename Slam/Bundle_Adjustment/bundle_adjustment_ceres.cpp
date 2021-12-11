@@ -89,7 +89,7 @@ int main(int argc, char **argv) {
     std::cout << summary.FullReport() << "\n";
 
 
-    dataset.WriteToPLYFile("after_ba.ply");
+    dataset.WriteToPLYFile("after_ba_ceres.ply");
 
 
    return 0;
