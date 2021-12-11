@@ -8,6 +8,8 @@ from ellcv.visu import draw_points, generate_triaxe_pointcloud
 from scipy.spatial.transform.rotation import Rotation as Rot
 from scipy.optimize import least_squares
 
+np.random.seed(1994)
+
 # Generate random points
 N = 10
 scene_min = -2.0
@@ -85,7 +87,7 @@ for ci, (R, t, P) in enumerate(cameras_gt):
     # draw_points(img, uvs_noisy_pose, color=(255, 0, 0))
 
     # noisy points observation in image
-    noisy_uvs = uvs + np.random.randn(uvs.shape[0], 2) * 3
+    noisy_uvs = uvs + np.random.randn(uvs.shape[0], 2) * 5
     measurements_noisy.append(noisy_uvs)
     draw_points(img, noisy_uvs, color=(0, 255, 0))
 
@@ -165,8 +167,7 @@ def to_lie_group(w):
 # Build state vector
 params = []
 for R, t, P in cameras_noisy:
-    # r = to_lie_algebra(R)
-    r = Rot.from_matrix(R).as_quat().tolist()
+    r = to_lie_algebra(R)
     params.extend(r + t.tolist())
 print(len(params), "parameters")
 
@@ -174,10 +175,9 @@ print(len(params), "parameters")
 
 def callback_least_squares(x, measurements, measurements_valid):
     Ps = []
-    for i in range(0, len(x), 7):
-        # R = to_lie_group(x[i:i+3])
-        R = Rot.from_quat(x[i:i+4]).as_matrix()
-        t = np.asarray(x[i+4:i+7]).reshape((3, 1))
+    for i in range(0, len(x), 6):
+        R = to_lie_group(x[i:i+3])
+        t = np.asarray(x[i+3:i+6]).reshape((3, 1))
         Ps.append(K @ np.hstack((R, t)))
 
 
@@ -202,10 +202,9 @@ x_optim = res.x
 cameras_optim = []
 optim_pts = []
 optim_col = []
-for i in range(0, len(x_optim), 7):
-    # R = to_lie_group(x_optim[i:i+4])
-    R = Rot.from_quat(x_optim[i:i+4]).as_matrix()
-    t = np.asarray(x_optim[i+4:i+7]).reshape((3, 1))
+for i in range(0, len(x_optim), 6):
+    R = to_lie_group(x_optim[i:i+3])
+    t = np.asarray(x_optim[i+3:i+6]).reshape((3, 1))
     cameras_optim.append((R, t))
     pts, col = generate_triaxe_pointcloud([R.T, -R.T @ t], size=0.7, sampling=100)
     optim_pts.append(pts)
@@ -222,8 +221,8 @@ print("=================== Results ================")
 for ci in range(T):
     rot_err, pos_err = pose_error(invert_pose(cameras_optim[ci]), invert_pose(cameras_gt[ci]))
     print("Camera", ci)
-    print("\trot error = %.4f°" % np.rad2deg(rot_err))
-    print("\tpos error = %.4fm" % pos_err)
+    print("\trot error = %.8f°" % np.rad2deg(rot_err))
+    print("\tpos error = %.8fm" % pos_err)
     print()
 
 
