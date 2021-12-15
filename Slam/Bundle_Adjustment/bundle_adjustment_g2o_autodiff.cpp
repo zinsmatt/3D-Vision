@@ -3,69 +3,39 @@
 #include <g2o/core/block_solver.h>
 #include <g2o/core/optimization_algorithm_levenberg.h>
 #include <g2o/solvers/csparse/linear_solver_csparse.h>
+#include "g2o/EXTERNAL/ceres/autodiff.h"
+#include <g2o/core/auto_differentiation.h>
+
 #include <g2o/core/robust_kernel_impl.h>
 #include <iostream>
 
 #include "common.h"
 #include <sophus/se3.hpp>
 #include <sophus/so3.hpp>
-
+#include <ceres/rotation.h>
 #include <Eigen/Dense>
 
 using namespace Sophus;
 using namespace Eigen;
 using namespace std;
 
-struct Camera
-{
-    Camera() {}
 
-    Camera(double* data)
-    {
-        R = Sophus::SO3d::exp(Eigen::Vector3d(data[0], data[1], data[2]));
-        t = Eigen::Vector3d(data[3], data[4], data[5]);
-        f = data[6];
-        k1 = data[7];
-        k2 = data[8];
-    }
 
-    void set_to(double* data) const
-    {
-        Eigen::Vector3d r = R.log();
-        for (int i = 0; i < 3; ++i)
-        {
-            data[i] = r[i];
-            data[i+3] = t[i];
-        }
-        data[6] = f;
-        data[7] = k1;
-        data[8] = k2;
-    }
-
-    Sophus::SO3d R;
-    Eigen::Vector3d t = Eigen::Vector3d::Zero();
-    double f = 0.0, k1 = 0.0, k2 = 0.0;
-};
-
-class VertexCamera: public g2o::BaseVertex<9, Camera>
+class VertexCamera: public g2o::BaseVertex<9, Eigen::Matrix<double, 9, 1>>      //  here the camera is parameterized as a 9-vector (angle axis, t, f, k1, k2) 
 {
     public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
     virtual void setToOriginImpl() override {
-        _estimate = Camera();
+        _estimate = Eigen::Matrix<double, 9, 1>::Zero();
     }
 
     virtual void oplusImpl(const double *update) override {
-        _estimate.R = Sophus::SO3d::exp(Eigen::Vector3d(update[0], update[1], update[2])) * _estimate.R;
-        _estimate.t += Eigen::Map<const Eigen::Vector3d>(update+3);
-        _estimate.f += update[6];
-        _estimate.k1 += update[7];
-        _estimate.k2 += update[8];
+        _estimate += Eigen::Map<const Eigen::Matrix<double, 9, 1>>(update);
     }
 
-    virtual bool read(std::istream&) override {}
-    virtual bool write(std::ostream&) const override {}
+    virtual bool read(std::istream&) override { return true; }
+    virtual bool write(std::ostream&) const override { return true; }
 };
 
 class VertexLandmark: public g2o::BaseVertex<3, Eigen::Vector3d>
@@ -81,8 +51,8 @@ class VertexLandmark: public g2o::BaseVertex<3, Eigen::Vector3d>
         _estimate += Eigen::Map<const Eigen::Vector3d>(update);
     }
 
-    virtual bool read(std::istream&) override {}
-    virtual bool write(std::ostream&) const override {}
+    virtual bool read(std::istream&) override { return true; }
+    virtual bool write(std::ostream&) const override { return true; }
 };
 
 
@@ -93,32 +63,40 @@ class EdgeReprojection: public g2o::BaseBinaryEdge<2, Eigen::Vector2d, VertexCam
 
     EdgeReprojection() { }
 
-    virtual void computeError() override {
-        const VertexCamera* v_cam = static_cast<VertexCamera*>(_vertices[0]);
-        const VertexLandmark* v_point = static_cast<VertexLandmark*>(_vertices[1]);
-        auto cam = v_cam->estimate();
-        Eigen::Vector3d X = v_point->estimate();
-        Eigen::Vector3d X_cam = (cam.R * X) + cam.t;
-        X_cam /= -X_cam.z(); // minus because of dataset
-        auto p2 = X_cam.x() * X_cam.x() + X_cam.y() * X_cam.y();
-        auto r = 1.0 + p2 * (cam.k1 + (p2 * cam.k2));
+    template <class T>
+    bool operator() (const T* camera, const T* landmark, T* residuals) const 
+    {
+        T Xc[3];
+        ceres::AngleAxisRotatePoint(camera, landmark, Xc);
+        Xc[0] += camera[3];
+        Xc[1] += camera[4];
+        Xc[2] += camera[5];
 
-        Eigen::Vector2d uv = X_cam.head<2>() * r * cam.f;
-        _error = _measurement - uv;
+        T Xp[2];
+        Xp[0] = Xc[0] / Xc[2];
+        Xp[1] = Xc[1] / Xc[2];
+
+        T n2 = Xp[0] * Xp[0] + Xp[1] * Xp[1];
+        T r = T(1.0) + n2 * (camera[7] + n2 * camera[8]);
+
+        T uv[2];
+        uv[0] = -Xp[0] * camera[6] * r;
+        uv[1] = -Xp[1] * camera[6] * r;
+
+        residuals[0] = T(_measurement[0]) - uv[0];
+        residuals[1] = T(_measurement[1]) - uv[1];
+        return true;
     }
 
-    // No jacobian
-    // use numeric derivatives
-
-    virtual bool read(std::istream&) override {}
-    virtual bool write(std::ostream&) const override {}
+    virtual bool read(std::istream&) override { return true; }
+    virtual bool write(std::ostream&) const override { return true; }
+    
+    G2O_MAKE_AUTO_AD_FUNCTIONS  // use autodiff
 
 };
 
 
 int main(int argc, char **argv) {
-
-    // Data can be downloaded from: https://grail.cs.washington.edu/projects/bal/
 
     if (argc != 2) {
         cout << "usage: bundle_adjustment_g2o bal_data.txt" << endl;
@@ -156,7 +134,7 @@ int main(int argc, char **argv) {
     {
         auto *c = new VertexCamera();
         c->setId(i);
-        c->setEstimate(Camera(cameras + (i*dataset.camera_block_size())));
+        c->setEstimate(Eigen::Map<Eigen::Matrix<double, 9, 1>>(cameras + (i*dataset.camera_block_size())));
         optimizer.addVertex(c);
         camera_vertices.push_back(c);
     }
@@ -192,7 +170,12 @@ int main(int argc, char **argv) {
 
     for (int i = 0; i < dataset.num_cameras(); ++i)
     {
-        camera_vertices[i]->estimate().set_to(cameras + (i * dataset.camera_block_size()));
+        Eigen::Matrix<double, 9, 1> in = camera_vertices[i]->estimate();
+        double *out = cameras + i * dataset.camera_block_size();
+        for (int i = 0; i < 9; ++i)
+        {
+            out[i] = in[i];
+        }
     }
     for (int i = 0; i < dataset.num_points(); ++i)
     {

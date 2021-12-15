@@ -65,8 +65,8 @@ class VertexCamera: public g2o::BaseVertex<6, Camera>
 
     }
 
-    virtual bool read(std::istream&) override {}
-    virtual bool write(std::ostream&) const override {}
+    virtual bool read(std::istream&) override { return true; }
+    virtual bool write(std::ostream&) const override { return true; }
 };
 
 class VertexLandmark: public g2o::BaseVertex<3, Eigen::Vector3d>
@@ -82,8 +82,8 @@ class VertexLandmark: public g2o::BaseVertex<3, Eigen::Vector3d>
         _estimate += Eigen::Map<const Eigen::Vector3d>(update);
     }
 
-    virtual bool read(std::istream&) override {}
-    virtual bool write(std::ostream&) const override {}
+    virtual bool read(std::istream&) override { return true; }
+    virtual bool write(std::ostream&) const override { return true; }
 };
 
 
@@ -141,8 +141,8 @@ class EdgeReprojection: public g2o::BaseBinaryEdge<2, Eigen::Vector2d, VertexLan
 
     }
 
-    virtual bool read(std::istream&) override {}
-    virtual bool write(std::ostream&) const override {}
+    virtual bool read(std::istream&) override { return true; }
+    virtual bool write(std::ostream&) const override { return true; }
     private:
         double f_, k1_, k2_;
 
