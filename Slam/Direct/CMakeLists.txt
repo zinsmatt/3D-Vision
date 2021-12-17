@@ -7,6 +7,9 @@ set(CMAKE_CXX_FLAGS "-std=c++11 ${SSE_FLAGS} -g -O3 -march=native")
 
 find_package(OpenCV REQUIRED)
 find_package(Sophus REQUIRED)
+# Ceres
+find_package(Ceres REQUIRED)
+include_directories(${CERES_INCLUDE_DIRS})
 
 include_directories(
         ${OpenCV_INCLUDE_DIRS}
@@ -17,3 +20,6 @@ include_directories(
 
 add_executable(direct_method_gn direct_method_gn.cpp)
 target_link_libraries(direct_method_gn ${OpenCV_LIBS} Sophus::Sophus)
+
+add_executable(direct_method_ceres direct_method_ceres.cpp)
+target_link_libraries(direct_method_ceres ${OpenCV_LIBS} ${CERES_LIBRARIES} Sophus::Sophus)

@@ -4,7 +4,7 @@
 
 
 using namespace std;
-
+// std::ofstream debug("debug_gn.txt");
 typedef vector<Eigen::Vector2d, Eigen::aligned_allocator<Eigen::Vector2d>> VecVector2d;
 
 // Camera intrinsics
@@ -33,18 +33,19 @@ inline float get(const cv::Mat &img, float x, float y) {
     uchar *data = &img.data[int(y) * img.step + int(x)];
     float xx = x - floor(x);
     float yy = y - floor(y);
-    return float(
+
+    float f = 
         (1 - xx) * (1 - yy) * data[0] +
         xx * (1 - yy) * data[1] +
         (1 - xx) * yy * data[img.step] +
-        xx * yy * data[img.step + 1]
-    );
+        xx * yy * data[img.step + 1];
+    return f;
 }
 
-Eigen::Vector3d get_3D_point_from_depth(const Eigen::Vector2d& p, double depth)
+Eigen::Vector3d get_3D_point_from_depth(const Eigen::Vector2d& p, double depth, const Eigen::Matrix3d& K)
 {
-    return Eigen::Vector3d(depth * (p.x() - cx) / fx,
-                           depth * (p.y() - cy) / fy,
+    return Eigen::Vector3d(depth * (p.x() - K(0, 2)) / K(0, 0),
+                           depth * (p.y() - K(1, 2)) / K(1, 1),
                            depth);
 }
 
@@ -66,15 +67,17 @@ void DirectPoseEstimationSingleLayer(
     Sophus::SE3d &Rt // points from cam1 reference frame to cam2
 )
 {
-    int nb_iters = 10;
-    int half_w_size = 2;
+    int nb_iters = 11;
+    int half_w_size = 1;
     double prev_cost = 0.0;
-
-
+    double fx = K(0, 0);
+    double fy = K(1, 1);
+    double cx = K(0, 2);
+    double cy = K(1, 2);
 
     for (int iter = 0; iter < nb_iters; iter++)
     {
-        std::cout << "Iter: " << iter << " ";
+        // std::cout << "Iter: " << iter << " ";
         Eigen::Matrix<double, 6, 6> H = Eigen::Matrix<double, 6, 6>::Zero();
         Eigen::Matrix<double, 6, 1> g = Eigen::Matrix<double, 6, 1>::Zero();
         double total_cost = 0.0;
@@ -82,7 +85,7 @@ void DirectPoseEstimationSingleLayer(
         for (int k = 0; k < px_ref.size(); ++k)
         {
             const auto& p1 = px_ref[k];
-            Eigen::Vector3d P_ref = get_3D_point_from_depth(p1, depth_ref[k]);
+            Eigen::Vector3d P_ref = get_3D_point_from_depth(p1, depth_ref[k], K);
             Eigen::Vector3d P2  = Rt * P_ref;
             double X2 = std::pow(P2.x(), 2);
             double Y2 = std::pow(P2.y(), 2);
@@ -98,6 +101,9 @@ void DirectPoseEstimationSingleLayer(
                 || p2.y() < half_w_size || p2.y() > img2.rows - half_w_size)
                 continue;
             
+            // debug << p1.x() << " " << p1.y() << "\n";
+            // debug << p2.x() << " " << p2.y() << "\n";
+            
             cnt_good++;
             for (int xx = -half_w_size; xx <= half_w_size; ++xx)
             {
@@ -105,6 +111,8 @@ void DirectPoseEstimationSingleLayer(
                 {
                     auto v1 = get(img1, p1.x() + xx, p1.y() + yy);
                     auto v2 = get(img2, p2.x() + xx, p2.y() + yy);
+                    // debug << v1 << " " << v2 << "\n";
+
                     double dx = 0.5 * (get(img2, p2.x() + xx + 1, p2.y() + yy) - get(img2, p2.x() + xx - 1, p2.y() + yy));
                     double dy = 0.5 * (get(img2, p2.x() + xx, p2.y() + yy + 1) - get(img2, p2.x() + xx, p2.y() + yy - 1));
                     Eigen::Vector2d dIdu(dx, dy);
@@ -112,6 +120,9 @@ void DirectPoseEstimationSingleLayer(
                     dudRt << fx/P2.z(), 0.0, -fx*P2.x() / Z2,-fx * P2.x() * P2.y() / Z2, fx + fx * X2 / Z2, -fx * P2.y() / P2.z(),
                              0.0, fy / P2.z(), -fy*P2.y()/Z2, -fy-fy * Y2 / Z2, fy * P2.x() * P2.y() / Z2, fy * P2.x() / P2.z();
                     Eigen::Matrix<double, 6, 1> J = -(dIdu.transpose() * dudRt).transpose();
+                    // debug << p1.x() << " " << p2.y() << " " << p2.x() << " " << p2.y() << "\n";
+                    // debug << v1 << " " << v2 << "\n";
+                    // debug << J.transpose() << "\n";
                     double err = v1 - v2;
                     H += J * J.transpose();
                     g += -J.transpose() * err;
@@ -119,8 +130,9 @@ void DirectPoseEstimationSingleLayer(
                 }
             }
         }
+        // debug << "-------------\n";
         Eigen::Matrix<double, 6, 1> delta = H.ldlt().solve(g);
-        std::cout << std::setw(4) << std::setprecision(3) << "\tcost: " << total_cost << "\t update norm: " << delta.norm() << "\n";
+        // std::cout << std::setw(4) << std::setprecision(3) << "\tcost: " << total_cost << "\t update norm: " << delta.norm() << "\n";
 
         if (std::isnan(delta[0]))
         {
@@ -157,16 +169,37 @@ void DirectPoseEstimationPyramidal(
     const Eigen::Matrix3d& K,
     Sophus::SE3d &Rt)
 {
-    int nb_levels = 1;
-    double factor = 2.0;
-    double scale = 1.0 / std::pow(factor, nb_levels-1);
+    int nb_levels = 4;
+    double factor = 0.5;
 
-
-    for (int l = 0; l < nb_levels; ++l)
+    std::vector<cv::Mat> pyr1, pyr2;
+    std::vector<double> scales;
+    for (int i = 0; i < nb_levels; ++i)
     {
-        cv::Mat img1_r, img2_r;
-        cv::resize(img1, img1_r, cv::Size(), scale, scale);
-        cv::resize(img2, img2_r, cv::Size(), scale, scale);
+        if (i == 0)
+        {
+            pyr1.push_back(img1);
+            pyr2.push_back(img2);
+            scales.push_back(1.0);
+        }
+        else
+        {
+            cv::Mat img1_r, img2_r;
+            cv::resize(pyr1[i-1], img1_r, cv::Size(pyr1[i-1].cols * factor, pyr1[i-1].rows * factor));
+            cv::resize(pyr2[i-1], img2_r, cv::Size(pyr2[i-1].cols * factor, pyr2[i-1].rows * factor));
+            pyr1.push_back(img1_r);            
+            pyr2.push_back(img2_r);            
+            scales.push_back(scales[i-1] * factor);
+        }
+    }
+
+
+    for (int l = nb_levels-1; l >= 0; l--)
+    {
+
+        cv::Mat img1_r = pyr1[l];
+        cv::Mat img2_r = pyr2[l];
+        double scale = scales[l];
 
         Eigen::Matrix3d K_r = K;
         K_r(0, 0) *= scale;
@@ -180,8 +213,6 @@ void DirectPoseEstimationPyramidal(
         }
 
         DirectPoseEstimationSingleLayer(img1_r, img2_r, p_r, depth_ref, K_r, Rt);
-
-        scale *= factor;
     }
 }
 
@@ -194,7 +225,7 @@ int main(int argc, char **argv) {
     // let's randomly pick pixels in the first image and generate some 3d points in the first image's frame
     cv::RNG rng(1994);
     int nPoints = 2000;
-    int boarder = 20;
+    int boarder = 40;
     VecVector2d pixels_ref;
     vector<double> depth_ref;
 
@@ -218,6 +249,7 @@ int main(int argc, char **argv) {
 
     for (int i = 1; i < 6; i++) {  // 1~10
         cv::Mat img = cv::imread((fmt_others % i).str(), 0);
+
         // try single layer by uncomment this line
         // DirectPoseEstimationSingleLayer(left_img, img, pixels_ref, depth_ref, K, Rt);
         DirectPoseEstimationPyramidal(left_img, img, pixels_ref, depth_ref, K, Rt);
@@ -229,7 +261,7 @@ int main(int argc, char **argv) {
         std::vector<Eigen::Vector2d> projections(pixels_ref.size());
         for (int i = 0; i < pixels_ref.size(); ++i)
         {
-            Eigen::Vector3d P_ref = get_3D_point_from_depth(pixels_ref[i], depth_ref[i]);
+            Eigen::Vector3d P_ref = get_3D_point_from_depth(pixels_ref[i], depth_ref[i], K);
             Eigen::Vector3d uv = K * (Rt * P_ref);
             projections[i] = uv.hnormalized();
         }
@@ -237,16 +269,18 @@ int main(int argc, char **argv) {
         for (size_t i = 0; i < pixels_ref.size(); ++i) {
             auto p_ref = pixels_ref[i];
             auto p_cur = projections[i];
-            if (p_cur[0] > 0 && p_cur[1] > 0) {
+            if (p_cur[0] > 0 && p_cur[1] > 0 && p_cur[0] < img2_show.cols && p_cur[1] < img2_show.rows) {
                 cv::circle(img2_show, cv::Point2f(p_cur[0], p_cur[1]), 2, cv::Scalar(0, 250, 0), 2);
                 cv::line(img2_show, cv::Point2f(p_ref[0], p_ref[1]), cv::Point2f(p_cur[0], p_cur[1]),
                         cv::Scalar(0, 250, 0));
             }
         }
-        cv::imshow("current", img2_show);
-        cv::waitKey();
-        // cv::imwrite("img_"+std::to_string(i) + ".png", img2_show);
+        // cv::imshow("current", img2_show);
+        // cv::waitKey();
+        cv::imwrite("img_"+std::to_string(i) + ".png", img2_show);
 
     }
+    // debug.close();
+
     return 0;
 }
