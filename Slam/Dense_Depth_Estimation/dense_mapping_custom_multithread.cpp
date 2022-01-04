@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <fstream>
+#include <thread>
 #include <cmath>
 #include <chrono>
 
@@ -23,8 +24,9 @@ using namespace Eigen;
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
-using namespace cv;
+#include "plot.h"
 
+using namespace cv;
 
 /**
  * Dataset from:
@@ -32,6 +34,7 @@ using namespace cv;
  *   http://rpg.ifi.uzh.ch/datasets/remode_test_data.zip
  * 
  * */
+
 
 // ------------------------------------------------------------------
 // parameters
@@ -55,20 +58,20 @@ std::ofstream debug("debug_custom.txt");
 
 
 
-inline double getBilinearInterpolatedValue(const Mat &img, const Vector2d &pt) {
-    uchar *d = &img.data[int(pt(1, 0)) * img.step + int(pt(0, 0))];
-    double xx = pt(0, 0) - floor(pt(0, 0));
-    double yy = pt(1, 0) - floor(pt(1, 0));
+inline double getBilinearInterpolatedValue_eigen(const Mat &img, const Eigen::Vector2d &pt) {
+    uchar *d = &img.data[int(pt[1]) * img.step + int(pt[0])];
+    double xx = pt[0] - floor(pt[0]);
+    double yy = pt[1] - floor(pt[1]);
     return ((1 - xx) * (1 - yy) * double(d[0]) +
             xx * (1 - yy) * double(d[1]) +
             (1 - xx) * yy * double(d[img.step]) +
             xx * yy * double(d[img.step + 1])) / 255.0;
 }
 
-// ------------------------------------------------------------------
-void plotDepth(const Mat &depth_truth, const Mat &depth_estimate);
 
-inline Vector3d px2cam(const Vector2d px) {
+// ------------------------------------------------------------------
+
+inline Vector3d px2cam(const Vector2d &px) {
     return Vector3d(
         (px(0, 0) - cx) / fx,
         (px(1, 0) - cy) / fy,
@@ -76,7 +79,7 @@ inline Vector3d px2cam(const Vector2d px) {
     );
 }
 
-inline Vector2d cam2px(const Vector3d p_cam) {
+inline Vector2d cam2px(const Vector3d &p_cam) {
     return Vector2d(
         p_cam(0, 0) * fx / p_cam(2, 0) + cx,
         p_cam(1, 0) * fy / p_cam(2, 0) + cy
@@ -96,18 +99,15 @@ bool readDatasetFiles(
     cv::Mat &ref_depth
 );
 
-void showEpipolarMatch(const Mat &ref, const Mat &curr, const Vector2d &px_ref, const Vector2d &px_curr);
-
-void showEpipolarLine(const Mat &ref, const Mat &curr, const Vector2d &px_ref, const Vector2d &px_min_curr,
-                      const Vector2d &px_max_curr);
 
 void evaludateDepth(const Mat &depth_truth, const Mat &depth_estimate);
 // ------------------------------------------------------------------
 
-double ZNCC(cv::Mat im1, const Eigen::Vector2d& pt1, cv::Mat im2, Eigen::Vector2d& pt2)
+double ZNCC(const cv::Mat& im1, const Eigen::Vector2d& pt1, const cv::Mat& im2, Eigen::Vector2d& pt2)
 {
     // no need to consider block partly outside because of boarder
-    std::vector<double> v1(ncc_area, 0.0), v2(ncc_area, 0.0);
+    // std::vector<double> v1(ncc_area, 0.0), v2(ncc_area, 0.0); // much slower
+    double v1[ncc_area], v2[ncc_area];
     double s1 = 0.0, s2 = 0.0;
     int idx = 0;
     for (int i = -ncc_window_size; i <= ncc_window_size; ++i)
@@ -115,7 +115,11 @@ double ZNCC(cv::Mat im1, const Eigen::Vector2d& pt1, cv::Mat im2, Eigen::Vector2
         for (int j = -ncc_window_size; j <= ncc_window_size; ++j)
         {
             double val_1 = static_cast<double>(im1.at<uchar>(pt1.y()+i, pt1.x()+j)) / 255;
-            double val_2 = getBilinearInterpolatedValue(im2, pt2 + Eigen::Vector2d(j, i));
+            Eigen::Vector2d temp_p2 = pt2;
+            temp_p2[0] += j;
+            temp_p2[1] += i;
+            double val_2 = getBilinearInterpolatedValue_eigen(im2, temp_p2);
+
             s1 += val_1;
             s2 += val_2;
             v1[idx] = val_1;
@@ -129,7 +133,7 @@ double ZNCC(cv::Mat im1, const Eigen::Vector2d& pt1, cv::Mat im2, Eigen::Vector2
 
     double numerator = 0.0;
     double den1 = 0.0, den2 = 0.0;
-    for (int i = 0; i < v1.size(); ++i)
+    for (int i = 0; i < ncc_area; ++i)
     {
         double zv1 = v1[i] - mean_1;
         double zv2 = v2[i] - mean_2;
@@ -256,32 +260,48 @@ void update_depth_filter(const Eigen::Vector2d& pr, const Eigen::Vector2d& pc, c
     cov2.at<double>(static_cast<int>(pr.y()), static_cast<int>(pr.x())) = sigma2_fused;
 }
 
+class ParallelDepthEstimator : public cv::ParallelLoopBody
+{
+    public:
+    ParallelDepthEstimator(cv::Mat ref, cv::Mat cur, const Sophus::SE3d& Tcr, cv::Mat depth, cv::Mat cov2)
+    : ref_(ref), cur_(cur), Tcr_(Tcr), depth_(depth), cov2_(cov2) {}
+
+    virtual void operator() (const cv::Range& range) const CV_OVERRIDE
+    {
+        for (int i = range.start; i < range.end; ++i)
+        {
+            for (int j = boarder; j < width-boarder; ++j)
+            {
+                double depth_mu = depth_.at<double>(i, j);
+                double depth_sigma2 = cov2_.at<double>(i, j);
+                if (depth_sigma2 < min_cov || depth_sigma2 > max_cov) 
+                    continue;
+                Eigen::Vector2d pr(j, i);
+                Eigen::Vector2d pc, epipolar_dir;
+                bool found = epipolar_search(ref_, cur_, Tcr_, pr, depth_mu, depth_sigma2, pc, epipolar_dir);
+                if (!found)
+                    continue;
+                // debug << epipolar_dir.transpose() << "\n";
+                // showEpipolarMatch(ref, cur, pr, pc);
+
+                update_depth_filter(pr, pc, Tcr_, epipolar_dir, depth_, cov2_);
+            }
+        }
+    }
+
+    private:
+        cv::Mat ref_, cur_, depth_, cov2_;
+        Sophus::SE3d Tcr_;
+
+};
 
 void update(cv::Mat ref, cv::Mat cur, const Sophus::SE3d& Tcr, cv::Mat depth, cv::Mat cov2)
 {
     Eigen::Vector2d pc;
     Eigen::Vector2d epipolar_dir;
-    for (int j = boarder; j < width-boarder; ++j)
-    {
-        for (int i = boarder; i < height-boarder; ++i)
-        {
-            double depth_mu = depth.at<double>(i, j);
-            double depth_sigma2 = cov2.at<double>(i, j);
-            if (depth_sigma2 < min_cov || depth_sigma2 > max_cov) 
-                continue;
-            Eigen::Vector2d pr(j, i);
-            bool found = epipolar_search(ref, cur, Tcr, pr, depth_mu, depth_sigma2, pc, epipolar_dir);
-            if (!found)
-                continue;
-            // debug << epipolar_dir.transpose() << "\n";
-
-            // showEpipolarMatch(ref, cur, pr, pc);
-
-            update_depth_filter(pr, pc, Tcr, epipolar_dir, depth, cov2);
-        }
-    }
-    // std::cout << depth << "\n";
-
+    // std::cout << "Nb parallel splits: " << std::thread::hardware_concurrency() << "\n";
+    ParallelDepthEstimator parallel_depth_estimator(ref, cur, Tcr, depth, cov2);
+    cv::parallel_for_(cv::Range(boarder, depth.rows-boarder), parallel_depth_estimator, std::thread::hardware_concurrency());
 }
 
 
@@ -323,8 +343,7 @@ int main(int argc, char **argv) {
         std::cout << "Time used: " << time_used.count() << "s\n";
         evaludateDepth(ref_depth, depth);
         plotDepth(ref_depth, depth);
-        imshow("image", curr);
-        waitKey(1);
+        plotCur(curr);
     }
 
     cout << "estimation returns, saving depth map ..." << endl;
@@ -374,12 +393,6 @@ bool readDatasetFiles(
 }
 
 
-void plotDepth(const Mat &depth_truth, const Mat &depth_estimate) {
-    imshow("depth_truth", depth_truth * 0.4);
-    imshow("depth_estimate", depth_estimate * 0.4);
-    imshow("depth_error", depth_truth - depth_estimate);
-    waitKey(1);
-}
 
 void evaludateDepth(const Mat &depth_truth, const Mat &depth_estimate) {
     double ave_depth_error = 0;
@@ -396,35 +409,4 @@ void evaludateDepth(const Mat &depth_truth, const Mat &depth_estimate) {
     ave_depth_error_sq /= cnt_depth_data;
 
     cout << "Average squared error = " << ave_depth_error_sq << ", average error: " << ave_depth_error << endl;
-}
-
-void showEpipolarMatch(const Mat &ref, const Mat &curr, const Vector2d &px_ref, const Vector2d &px_curr) {
-    Mat ref_show, curr_show;
-    cv::cvtColor(ref, ref_show, CV_GRAY2BGR);
-    cv::cvtColor(curr, curr_show, CV_GRAY2BGR);
-
-    cv::circle(ref_show, cv::Point2f(px_ref(0, 0), px_ref(1, 0)), 5, cv::Scalar(0, 0, 250), 2);
-    cv::circle(curr_show, cv::Point2f(px_curr(0, 0), px_curr(1, 0)), 5, cv::Scalar(0, 0, 250), 2);
-
-    imshow("ref", ref_show);
-    imshow("curr", curr_show);
-    waitKey();
-}
-
-void showEpipolarLine(const Mat &ref, const Mat &curr, const Vector2d &px_ref, const Vector2d &px_min_curr,
-                      const Vector2d &px_max_curr) {
-
-    Mat ref_show, curr_show;
-    cv::cvtColor(ref, ref_show, CV_GRAY2BGR);
-    cv::cvtColor(curr, curr_show, CV_GRAY2BGR);
-
-    cv::circle(ref_show, cv::Point2f(px_ref(0, 0), px_ref(1, 0)), 5, cv::Scalar(0, 255, 0), 2);
-    cv::circle(curr_show, cv::Point2f(px_min_curr(0, 0), px_min_curr(1, 0)), 5, cv::Scalar(0, 255, 0), 2);
-    cv::circle(curr_show, cv::Point2f(px_max_curr(0, 0), px_max_curr(1, 0)), 5, cv::Scalar(0, 255, 0), 2);
-    cv::line(curr_show, Point2f(px_min_curr(0, 0), px_min_curr(1, 0)), Point2f(px_max_curr(0, 0), px_max_curr(1, 0)),
-             Scalar(0, 255, 0), 1);
-
-    imshow("ref", ref_show);
-    imshow("curr", curr_show);
-    waitKey(1);
 }

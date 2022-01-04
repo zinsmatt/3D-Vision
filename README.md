@@ -22,6 +22,9 @@ Some 3D vision algorithms
 ## Bundle Adjustment
 <img src="Slam/Bundle_Adjustment/doc/bundle_adjustment.png" width="800" height="226">
 
+## Multi-view Dense Depth Estimation (CUDA)
+<img src="Slam/Dense_Depth_Estimation/doc/dense_depth_estimate.png" width="426" height="320">
+
 
 ## Calibration
 The folder *Calibration* contains algorithms to calibration the camera focal view from vanishing points.
