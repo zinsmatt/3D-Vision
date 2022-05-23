@@ -23,7 +23,7 @@ def pose_matrix_to_quat(pose):
         a 7-vector (qx, qy, qz, qw, x, y, z)
     """
     assert pose.shape == (4, 4)
-    q = Rot.from_dcm(pose[:3, :3]).as_quat()
+    q = Rot.from_matrix(pose[:3, :3]).as_quat()
     return np.hstack((q, pose[:3, 3]))
 
 
@@ -33,7 +33,7 @@ def pose_quat_to_matrix(pose):
         (qx, qy, qz, qw, x, y, z) to a matrix
     """
     assert pose.size == 7
-    R = Rot.from_quat(pose[:4]).as_dcm()
+    R = Rot.from_quat(pose[:4]).as_matrix()
     p = np.eye(4, dtype=np.float)
     p[:3, :3] = R
     p[:3, 3] = pose[4:]
